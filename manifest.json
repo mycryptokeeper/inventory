@@ -1,0 +1,25 @@
+{
+  "name": "RelevantTec Inventory",
+  "short_name": "RT Inventory",
+  "description": "RelevantTec LLC Parts & Stock Management",
+  "start_url": "/inventory/",
+  "scope": "/inventory/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#1a1a1a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
