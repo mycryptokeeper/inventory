@@ -190,25 +190,70 @@ let currentLoc = 'All';
 let accessToken = null;
 let tokenClient = null;
 let gsiReady = false;
+let tokenExpiry = 0;
 
 function onGsiLoad(){
   gsiReady = true;
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
+    prompt: '',
     callback: async (resp) => {
-      if(resp.error){ showToast('Sign in failed: ' + resp.error); return; }
+      if(resp.error){
+        if(resp.error==='interaction_required'||resp.error==='consent_required'||resp.error==='access_denied'){
+          tokenClient2.requestAccessToken({prompt:'consent'});
+        } else {
+          localStorage.removeItem('rt_logged_in');
+          document.getElementById('login-screen').style.display='flex';
+          document.getElementById('login-screen').innerHTML=loginHTML;
+        }
+        return;
+      }
       accessToken = resp.access_token;
+      tokenExpiry = Date.now() + ((resp.expires_in||3600) - 120) * 1000;
+      localStorage.setItem('rt_logged_in','1');
       await getUserInfo();
       showApp();
       await loadFromSheets();
     }
   });
+  const tokenClient2 = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if(resp.error){ showToast('Sign in failed: '+resp.error); return; }
+      accessToken = resp.access_token;
+      tokenExpiry = Date.now() + ((resp.expires_in||3600) - 120) * 1000;
+      localStorage.setItem('rt_logged_in','1');
+      await getUserInfo();
+      showApp();
+      await loadFromSheets();
+    }
+  });
+  window._tokenClient2 = tokenClient2;
+  const wasLoggedIn = localStorage.getItem('rt_logged_in');
+  if(wasLoggedIn){
+    document.getElementById('login-screen').innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-size:14px;color:#888;gap:10px"><div style="width:18px;height:18px;border:2px solid #e5e5e5;border-top-color:#888;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0"></div>Signing you in...</div>';
+    tokenClient.requestAccessToken({prompt:''});
+  }
 }
+
+const loginHTML = document.getElementById('login-screen').innerHTML;
 
 function startGoogleLogin(){
   if(!gsiReady){ showToast('Loading, please wait...'); setTimeout(startGoogleLogin, 600); return; }
-  tokenClient.requestAccessToken({prompt:'consent'});
+  window._tokenClient2.requestAccessToken({prompt:'consent'});
+}
+
+async function ensureFreshToken(){
+  if(Date.now() < tokenExpiry) return true;
+  return new Promise(resolve=>{
+    const rc = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID, scope: SCOPES, prompt:'',
+      callback:(resp)=>{ if(resp.error){resolve(false);return;} accessToken=resp.access_token; tokenExpiry=Date.now()+((resp.expires_in||3600)-120)*1000; resolve(true); }
+    });
+    rc.requestAccessToken({prompt:''});
+  });
 }
 
 async function getUserInfo(){
@@ -216,8 +261,12 @@ async function getUserInfo(){
     const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+accessToken}});
     const d = await r.json();
     const initials = (d.name||d.email||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    localStorage.setItem('rt_initials', initials);
     document.getElementById('user-avatar').textContent = initials;
-  }catch(e){}
+  }catch(e){
+    const saved = localStorage.getItem('rt_initials');
+    if(saved) document.getElementById('user-avatar').textContent = saved;
+  }
 }
 
 function showApp(){
@@ -231,7 +280,11 @@ function showApp(){
 function signOut(){
   if(typeof google !== 'undefined') google.accounts.oauth2.revoke(accessToken, ()=>{});
   accessToken = null;
+  tokenExpiry = 0;
   parts = [];
+  localStorage.removeItem('rt_logged_in');
+  localStorage.removeItem('rt_initials');
+  document.getElementById('login-screen').innerHTML = loginHTML;
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
 }
