@@ -253,7 +253,7 @@ async function sheetsPut(values){
   const r = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1!A1:ZZ9999?valueInputOption=RAW`,
     {method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-     body:JSON.stringify({range:'Sheet1',majorDimension:'ROWS',values})}
+     body:JSON.stringify({range:'Sheet1!A1:ZZ9999',majorDimension:'ROWS',values})}
   );
   if(!r.ok){
     const e=await r.json();
